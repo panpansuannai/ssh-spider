@@ -22,13 +22,12 @@ func main() {
 
 	// Setup slog library.
 	var logLevel = new(slog.LevelVar)
+	logLevel.Set(config.LogLevel)
 	h := slog.HandlerOptions{
-		// Cost more time.
-		AddSource: true,
+		AddSource: config.LogSource,
 		Level:     logLevel,
 	}.NewTextHandler(os.Stdout)
 	slog.SetDefault(slog.New(h))
-	logLevel.Set(config.LogLevel)
 
 	// Allow the current process to lock memory for eBPF resources.
 	if err := rlimit.RemoveMemlock(); err != nil {
