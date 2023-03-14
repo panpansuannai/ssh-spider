@@ -5,6 +5,7 @@ package main
 import (
 	"cilium-spider/analyzer"
 	"context"
+	"flag"
 	"os"
 	"os/signal"
 	"syscall"
@@ -25,6 +26,12 @@ func main() {
 	}.NewTextHandler(os.Stdout)
 	slog.SetDefault(slog.New(h))
 	logLevel.Set(slog.LevelDebug)
+
+	pamProbeFlag := flag.Bool("libpam", false, "")
+	cProbeFlag := flag.Bool("libc", false, "")
+	utilProbeFlag := flag.Bool("libutil", false, "")
+	syscallProbeFlag := flag.Bool("syscall", false, "")
+	flag.Parse()
 
 	// Allow the current process to lock memory for eBPF resources.
 	if err := rlimit.RemoveMemlock(); err != nil {
@@ -52,18 +59,28 @@ func main() {
 	perfCtx, perfCanceler := context.WithCancel(context.Background())
 	defer perfCanceler()
 
-	for _, p := range AttachSyscallTraceEnter(perfCtx, &objs, evBus, behaviorAnalyzer) {
-		defer p.Close()
+	if *syscallProbeFlag {
+		for _, p := range AttachSyscallTraceEnter(perfCtx, &objs, evBus, behaviorAnalyzer) {
+			defer p.Close()
+		}
 	}
 
-	for _, p := range AttachLibC(perfCtx, &objs, evBus, behaviorAnalyzer) {
-		defer p.Close()
+	if *cProbeFlag {
+		for _, p := range AttachLibC(perfCtx, &objs, evBus, behaviorAnalyzer) {
+			defer p.Close()
+		}
 	}
-	for _, p := range AttachLibPam(perfCtx, &objs, evBus, behaviorAnalyzer) {
-		defer p.Close()
+
+	if *pamProbeFlag {
+		for _, p := range AttachLibPam(perfCtx, &objs, evBus, behaviorAnalyzer) {
+			defer p.Close()
+		}
 	}
-	for _, p := range AttachLibUtil(perfCtx, &objs, evBus, behaviorAnalyzer) {
-		defer p.Close()
+
+	if *utilProbeFlag {
+		for _, p := range AttachLibUtil(perfCtx, &objs, evBus, behaviorAnalyzer) {
+			defer p.Close()
+		}
 	}
 
 	stopper := make(chan os.Signal, 1)
