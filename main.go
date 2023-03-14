@@ -31,7 +31,21 @@ func main() {
 	cProbeFlag := flag.Bool("libc", false, "")
 	utilProbeFlag := flag.Bool("libutil", false, "")
 	syscallProbeFlag := flag.Bool("syscall", false, "")
+	logLevelFlag := flag.Int("loglevel", 0, "")
 	flag.Parse()
+
+	switch *logLevelFlag {
+	case 0:
+		logLevel.Set(slog.LevelDebug)
+	case 1:
+		logLevel.Set(slog.LevelInfo)
+	case 2:
+		logLevel.Set(slog.LevelWarn)
+	case 3:
+		logLevel.Set(slog.LevelError)
+	default:
+		logLevel.Set(slog.LevelDebug)
+	}
 
 	// Allow the current process to lock memory for eBPF resources.
 	if err := rlimit.RemoveMemlock(); err != nil {
