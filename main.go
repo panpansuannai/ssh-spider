@@ -3,20 +3,23 @@
 package main
 
 import (
-	"cilium-spider/analyzer"
 	"context"
-	"flag"
 	"os"
 	"os/signal"
 	"syscall"
 
-	"golang.org/x/exp/slog"
-
 	"github.com/asaskevich/EventBus"
 	"github.com/cilium/ebpf/rlimit"
+	"golang.org/x/exp/slog"
+
+	"cilium-spider/analyzer"
+	"cilium-spider/config"
 )
 
 func main() {
+	// Initialize config.
+	config := config.New()
+
 	// Setup slog library.
 	var logLevel = new(slog.LevelVar)
 	h := slog.HandlerOptions{
@@ -25,27 +28,7 @@ func main() {
 		Level:     logLevel,
 	}.NewTextHandler(os.Stdout)
 	slog.SetDefault(slog.New(h))
-	logLevel.Set(slog.LevelDebug)
-
-	pamProbeFlag := flag.Bool("libpam", false, "")
-	cProbeFlag := flag.Bool("libc", false, "")
-	utilProbeFlag := flag.Bool("libutil", false, "")
-	syscallProbeFlag := flag.Bool("syscall", false, "")
-	logLevelFlag := flag.Int("loglevel", 0, "")
-	flag.Parse()
-
-	switch *logLevelFlag {
-	case 0:
-		logLevel.Set(slog.LevelDebug)
-	case 1:
-		logLevel.Set(slog.LevelInfo)
-	case 2:
-		logLevel.Set(slog.LevelWarn)
-	case 3:
-		logLevel.Set(slog.LevelError)
-	default:
-		logLevel.Set(slog.LevelDebug)
-	}
+	logLevel.Set(config.LogLevel)
 
 	// Allow the current process to lock memory for eBPF resources.
 	if err := rlimit.RemoveMemlock(); err != nil {
@@ -57,6 +40,7 @@ func main() {
 	spec, err := loadBpf()
 	if err != nil {
 		slog.Error("loading bpf error", err)
+		return
 	}
 	objs := bpfObjects{}
 	defer objs.Close()
@@ -64,6 +48,7 @@ func main() {
 	if err := spec.LoadAndAssign(&objs, nil); err != nil {
 		// log.Printf("%v", spec.Programs["after_getpwnam"])
 		slog.Error("loading objects error", err)
+		return
 	}
 
 	evBus := EventBus.New()
@@ -73,25 +58,25 @@ func main() {
 	perfCtx, perfCanceler := context.WithCancel(context.Background())
 	defer perfCanceler()
 
-	if *syscallProbeFlag {
+	if config.UseSyscall {
 		for _, p := range AttachSyscallTraceEnter(perfCtx, &objs, evBus, behaviorAnalyzer) {
 			defer p.Close()
 		}
 	}
 
-	if *cProbeFlag {
+	if config.UseLibC {
 		for _, p := range AttachLibC(perfCtx, &objs, evBus, behaviorAnalyzer) {
 			defer p.Close()
 		}
 	}
 
-	if *pamProbeFlag {
+	if config.UseLibPam {
 		for _, p := range AttachLibPam(perfCtx, &objs, evBus, behaviorAnalyzer) {
 			defer p.Close()
 		}
 	}
 
-	if *utilProbeFlag {
+	if config.UseLibUtil {
 		for _, p := range AttachLibUtil(perfCtx, &objs, evBus, behaviorAnalyzer) {
 			defer p.Close()
 		}
