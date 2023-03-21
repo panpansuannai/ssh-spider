@@ -18,8 +18,6 @@ const (
 	MSG_TY_ERR
 )
 
-type PerfMsgHandler func(PerfMsg, *analyzer.Analyzer)
-
 type PerfMsg struct {
 	Rd    perf.Record
 	MsgTy int

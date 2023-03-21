@@ -12,6 +12,8 @@ type Analyzer struct {
 	history      []Behavior
 }
 
+const behaviorHistoryLength = 100
+
 func (a *Analyzer) Act(b Behavior) {
 	a.behaviorChan <- b
 }
@@ -54,8 +56,8 @@ func (a *Analyzer) analyzeBehavior(behavior Behavior) {
 		slog.Info("[Unknown behavior]")
 	}
 	// Drop unused history behavior.
-	if len(a.history) > 100 {
-		a.history = a.history[50:]
+	if len(a.history) >= behaviorHistoryLength-1 {
+		a.history = a.history[behaviorHistoryLength/2:]
 	}
 }
 
@@ -67,7 +69,7 @@ func NewAnalyzer(chanSize int) *Analyzer {
 	a := Analyzer{
 		behaviorChan: make(chan Behavior, chanSize),
 		stopper:      make(chan struct{}, 0),
-		history:      make([]Behavior, 0),
+		history:      make([]Behavior, 0, behaviorHistoryLength),
 	}
 	go func() {
 		a.analyze()

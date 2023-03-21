@@ -64,6 +64,7 @@ func syscallTraceEnterHandler(a *analyzer.Analyzer, m util.PerfMsg) {
 }
 
 func AttachSyscallTraceEnter(ctx context.Context, objs *bpfObjects, evBus EventBus.Bus, a *analyzer.Analyzer) []link.Link {
+	// Generate system call table, map system call number to system call name.
 	table, err := util.ParseSyscallsTBLFile("./syscall_64.tbl")
 	if err != nil {
 		panic(fmt.Sprintf("parse syscall tbl file: %v", err))

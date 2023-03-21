@@ -50,9 +50,10 @@ func main() {
 		return
 	}
 
-	evBus := EventBus.New()
 	behaviorAnalyzer := analyzer.NewAnalyzer(0)
 	defer behaviorAnalyzer.Stop()
+
+	evBus := EventBus.New()
 
 	perfCtx, perfCanceler := context.WithCancel(context.Background())
 	defer perfCanceler()
