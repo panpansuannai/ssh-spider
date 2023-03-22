@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -14,6 +15,7 @@ import (
 
 	"cilium-spider/analyzer"
 	"cilium-spider/config"
+	"cilium-spider/logger"
 )
 
 func main() {
@@ -23,11 +25,22 @@ func main() {
 	// Setup slog library.
 	var logLevel = new(slog.LevelVar)
 	logLevel.Set(config.LogLevel)
-	h := slog.HandlerOptions{
-		AddSource: config.LogSource,
-		Level:     logLevel,
-	}.NewTextHandler(os.Stdout)
+	h := logger.NewJSONLogHandler(
+		slog.HandlerOptions{
+			AddSource: config.LogSource,
+			Level:     logLevel,
+		})
 	slog.SetDefault(slog.New(h))
+
+	// TODO: Handle log handler's output by recieving from chan.
+	go func() {
+		for {
+			select {
+			case msg := <-h.Chan():
+				fmt.Println(string(msg))
+			}
+		}
+	}()
 
 	// Allow the current process to lock memory for eBPF resources.
 	if err := rlimit.RemoveMemlock(); err != nil {
