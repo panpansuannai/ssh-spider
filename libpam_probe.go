@@ -91,35 +91,35 @@ func (b *bpfEventPam) GenerateSlogAttr() slog.Attr {
 	return slog.Group("pam",
 		slog.Group("Base",
 			slog.Int64("PID", int64(b.Base.Pid)),
-			slog.String("COMM", util.Int8Slice2String(b.Base.Comm[:])),
+			slog.String("COMM", int8Slice2String(b.Base.Comm[:])),
 			slog.Int64("CPU", int64(b.Base.Cpu)),
-			slog.String("Error", util.Int8Slice2String(b.Base.ErrMsg[:]))),
-		slog.String("api_name", util.Int8Slice2String(b.ApiName[:])),
-		slog.String("service_name", util.Int8Slice2String(b.ServiceName[:])),
-		slog.String("user", util.Int8Slice2String(b.User[:])),
-		slog.String("authtok", util.Int8Slice2String(b.Authtok[:])),
+			slog.String("Error", int8Slice2String(b.Base.ErrMsg[:]))),
+		slog.String("api_name", int8Slice2String(b.ApiName[:])),
+		slog.String("service_name", int8Slice2String(b.ServiceName[:])),
+		slog.String("user", int8Slice2String(b.User[:])),
+		slog.String("authtok", int8Slice2String(b.Authtok[:])),
 		slog.String("ret", PamRet(b.PamRet).String()),
 	)
 }
 
 // Handle Perf Event
-func pamPerfEventHandler(a *analyzer.Analyzer, m util.PerfMsg) {
+func pamPerfEventHandler(req *PerfMsgHandleRequest) {
 	var event bpfEventPam
 	// Parse the perf event entry into a bpfEvent structure.
-	if err := binary.Read(bytes.NewBuffer(m.Rd.RawSample), binary.LittleEndian, &event); err != nil {
+	if err := binary.Read(bytes.NewBuffer(req.Msg.Rd.RawSample), binary.LittleEndian, &event); err != nil {
 		log.Printf("parsing perf event: %s", err)
 		return
 	}
-	if a != nil && PamRet(event.PamRet).String() == "SUCCESS" {
-		a.Act(&analyzer.PamAuthenticateBehavior{
+	if req.Analyzer != nil && PamRet(event.PamRet).String() == "SUCCESS" {
+		req.Analyzer.Act(&analyzer.PamAuthenticateBehavior{
 			BehaviorBase: analyzer.BehaviorBase{
 				Pid:  event.Base.Pid,
-				Comm: util.Int8Slice2String(event.Base.Comm[:]),
+				Comm: int8Slice2String(event.Base.Comm[:]),
 				Time: time.Now(),
 			},
 		})
 	}
-	// log.Printf("[%s:%d](%s) %s({service_name:%s;user:%s;authtok:%s;})=>(%s)", util.Int8Slice2String(event.Base.Comm[:]), event.Base.Pid, util.Int8Slice2String(event.Base.ErrMsg[:]), util.Int8Slice2String(event.ApiName[:]), util.Int8Slice2String(event.ServiceName[:]), util.Int8Slice2String(event.User[:]), util.Int8Slice2String(event.Authtok[:]), PamRet(event.PamRet))
+	// log.Printf("[%s:%d](%s) %s({service_name:%s;user:%s;authtok:%s;})=>(%s)", int8Slice2String(event.Base.Comm[:]), event.Base.Pid, int8Slice2String(event.Base.ErrMsg[:]), int8Slice2String(event.ApiName[:]), int8Slice2String(event.ServiceName[:]), int8Slice2String(event.User[:]), int8Slice2String(event.Authtok[:]), PamRet(event.PamRet))
 	slog.Debug("", event.GenerateSlogAttr())
 }
 
@@ -138,7 +138,13 @@ func AttachLibPam(req *ProbeRequest) []link.Link {
 			Probe:      req.Objs.AfterPamAuthenticate,
 		},
 	})
-	req.EvBus.Subscribe("perf:pam_authenticate", pamPerfEventHandler)
-	util.PerfHandle(req.Ctx, req.Objs.EventsPam, req.EvBus, "perf:pam_authenticate", req.Analyzer)
+	registerPerfMsgHandler(&PerfHandlerRegisterRequest{
+		ctx:      req.Ctx,
+		m:        req.Objs.EventsPam,
+		topic:    "perf:pam_authenticate",
+		analyzer: *req.Analyzer,
+		handler:  pamPerfEventHandler,
+	})
+
 	return probes
 }

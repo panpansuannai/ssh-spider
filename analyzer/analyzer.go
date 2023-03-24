@@ -1,6 +1,8 @@
 package analyzer
 
-import "context"
+import (
+	"context"
+)
 
 type Analyzer struct {
 	ctx          context.Context

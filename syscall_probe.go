@@ -18,42 +18,42 @@ func (b *bpfEventSyscallTraceEnter) GenerateSlogAttr(name string) slog.Attr {
 	return slog.Group("syscall_trace_enter",
 		slog.Group("Base",
 			slog.Int64("PID", int64(b.Base.Pid)),
-			slog.String("COMM", util.Int8Slice2String(b.Base.Comm[:])),
+			slog.String("COMM", int8Slice2String(b.Base.Comm[:])),
 			slog.Int64("CPU", int64(b.Base.Cpu)),
-			slog.String("Error", util.Int8Slice2String(b.Base.ErrMsg[:]))),
+			slog.String("Error", int8Slice2String(b.Base.ErrMsg[:]))),
 		slog.Int64("syscall_num", int64(b.SyscallNum)),
 		slog.String("syscall_name", name),
 	)
 }
 
-func syscallTraceEnterHandler(a *analyzer.Analyzer, m util.PerfMsg) {
+func syscallTraceEnterHandler(req *PerfMsgHandleRequest) {
 	// Handle only success message.
-	if m.MsgTy != util.MSG_TY_SUCCESS {
+	if req.Msg.MsgTy != MSG_TY_SUCCESS {
 		return
 	}
 
 	var event bpfEventSyscallTraceEnter
 	// Parse the perf event entry into a bpfEvent structure.
-	if err := binary.Read(bytes.NewBuffer(m.Rd.RawSample), binary.LittleEndian, &event); err != nil {
+	if err := binary.Read(bytes.NewBuffer(req.Msg.Rd.RawSample), binary.LittleEndian, &event); err != nil {
 		slog.Error("parsing perf event error", err)
 		return
 	}
 	base := analyzer.BehaviorBase{
 		Pid:  event.Base.Pid,
-		Comm: util.Int8Slice2String(event.Base.Comm[:]),
+		Comm: int8Slice2String(event.Base.Comm[:]),
 		Time: time.Now(),
 	}
 	syscallName, ok := syscallTable[event.SyscallNum]
 	if !ok {
 		slog.Debug("", event.GenerateSlogAttr(syscallName))
-		a.Act(&analyzer.SyscallBehavior{
+		req.Analyzer.Act(&analyzer.SyscallBehavior{
 			BehaviorBase: base,
 			SyscallNum:   event.SyscallNum,
 			SyscallName:  syscallName,
 		})
 	} else {
 		slog.Debug("", event.GenerateSlogAttr("unknown"))
-		a.Act(&analyzer.SyscallBehavior{
+		req.Analyzer.Act(&analyzer.SyscallBehavior{
 			BehaviorBase: base,
 			SyscallNum:   event.SyscallNum,
 			SyscallName:  "Unknown",
@@ -76,8 +76,12 @@ func AttachSyscallTraceEnter(req *ProbeRequest) []link.Link {
 			Probe:      req.Objs.BeforeSyscallTraceEnter,
 		},
 	})
-
-	req.EvBus.Subscribe("perf:syscall_trace_enter", syscallTraceEnterHandler)
-	util.PerfHandle(req.Ctx, req.Objs.EventsSyscallTraceEnter, req.EvBus, "perf:syscall_trace_enter", req.Analyzer)
+	registerPerfMsgHandler(&PerfHandlerRegisterRequest{
+		ctx:      req.Ctx,
+		m:        req.Objs.EventsSyscallTraceEnter,
+		topic:    "perf:syscall_trace_enter",
+		analyzer: *req.Analyzer,
+		handler:  syscallTraceEnterHandler,
+	})
 	return kps
 }

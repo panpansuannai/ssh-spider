@@ -15,24 +15,24 @@ func (b *bpfEventOpenpty) GenerateSlogAttr() slog.Attr {
 	return slog.Group("openpty",
 		slog.Group("Base",
 			slog.Int64("PID", int64(b.Base.Pid)),
-			slog.String("COMM", util.Int8Slice2String(b.Base.Comm[:])),
+			slog.String("COMM", int8Slice2String(b.Base.Comm[:])),
 			slog.Int64("CPU", int64(b.Base.Cpu)),
-			slog.String("Error", util.Int8Slice2String(b.Base.ErrMsg[:]))),
+			slog.String("Error", int8Slice2String(b.Base.ErrMsg[:]))),
 	)
 }
 
-func openptyPerfEventHandler(a *analyzer.Analyzer, m util.PerfMsg) {
+func openptyPerfEventHandler(req *PerfMsgHandleRequest) {
 	var event bpfEventOpenpty
 	// Parse the perf event entry into a bpfEvent structure.
-	if err := binary.Read(bytes.NewBuffer(m.Rd.RawSample), binary.LittleEndian, &event); err != nil {
+	if err := binary.Read(bytes.NewBuffer(req.Msg.Rd.RawSample), binary.LittleEndian, &event); err != nil {
 		slog.Error("parsing perf event errror", err)
 		return
 	}
-	if a != nil {
-		a.Act(&analyzer.OpenptyBehavior{
+	if req.Analyzer != nil {
+		req.Analyzer.Act(&analyzer.OpenptyBehavior{
 			BehaviorBase: analyzer.BehaviorBase{
 				Pid:  event.Base.Pid,
-				Comm: util.Int8Slice2String(event.Base.Comm[:]),
+				Comm: int8Slice2String(event.Base.Comm[:]),
 				Time: time.Now(),
 			},
 		})
@@ -51,7 +51,13 @@ func AttachLibUtil(req *ProbeRequest) []link.Link {
 			Probe:      req.Objs.AfterOpenpty,
 		},
 	})
-	req.EvBus.Subscribe("perf:openpty", openptyPerfEventHandler)
-	util.PerfHandle(req.Ctx, req.Objs.EventsOpenpty, req.EvBus, "perf:openpty", req.Analyzer)
+
+	registerPerfMsgHandler(&PerfHandlerRegisterRequest{
+		ctx:      req.Ctx,
+		m:        req.Objs.EventsOpenpty,
+		topic:    "perf:openpty",
+		analyzer: *req.Analyzer,
+		handler:  openptyPerfEventHandler,
+	})
 	return probes
 }

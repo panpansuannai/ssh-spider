@@ -92,12 +92,10 @@ type ProbeRequest struct {
 
 func AttachProbesFactory(ctx context.Context, config *config.Config, objs *bpfObjects) func() {
 	behaviorAnalyzer := analyzer.NewAnalyzer(ctx, 0)
-	evBus := EventBus.New()
 
 	req := &ProbeRequest{
 		Ctx:      ctx,
 		Objs:     objs,
-		EvBus:    evBus,
 		Analyzer: behaviorAnalyzer,
 	}
 
