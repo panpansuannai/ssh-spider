@@ -121,14 +121,12 @@ func AttachLibC(req *ProbeRequest) []link.Link {
 	registerPerfMsgHandler(&PerfHandlerRegisterRequest{
 		ctx:      req.Ctx,
 		m:        req.Objs.EventsGetpwnam,
-		topic:    "perf:getpwnam",
 		analyzer: *req.Analyzer,
 		handler:  getpwnamPerfEventHandler,
 	})
 	registerPerfMsgHandler(&PerfHandlerRegisterRequest{
 		ctx:      req.Ctx,
 		m:        req.Objs.EventsGetpwuid,
-		topic:    "perf:getpwuid",
 		analyzer: *req.Analyzer,
 		handler:  getpwuidPerfEventHandler,
 	})

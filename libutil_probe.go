@@ -55,7 +55,6 @@ func AttachLibUtil(req *ProbeRequest) []link.Link {
 	registerPerfMsgHandler(&PerfHandlerRegisterRequest{
 		ctx:      req.Ctx,
 		m:        req.Objs.EventsOpenpty,
-		topic:    "perf:openpty",
 		analyzer: *req.Analyzer,
 		handler:  openptyPerfEventHandler,
 	})

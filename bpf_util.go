@@ -43,7 +43,6 @@ type PerfMsgHandler func(*PerfMsgHandleRequest)
 type PerfHandlerRegisterRequest struct {
 	ctx      context.Context
 	m        *ebpf.Map
-	topic    string
 	analyzer analyzer.Analyzer
 	handler  PerfMsgHandler
 }

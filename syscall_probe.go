@@ -79,7 +79,6 @@ func AttachSyscallTraceEnter(req *ProbeRequest) []link.Link {
 	registerPerfMsgHandler(&PerfHandlerRegisterRequest{
 		ctx:      req.Ctx,
 		m:        req.Objs.EventsSyscallTraceEnter,
-		topic:    "perf:syscall_trace_enter",
 		analyzer: *req.Analyzer,
 		handler:  syscallTraceEnterHandler,
 	})

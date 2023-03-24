@@ -141,7 +141,6 @@ func AttachLibPam(req *ProbeRequest) []link.Link {
 	registerPerfMsgHandler(&PerfHandlerRegisterRequest{
 		ctx:      req.Ctx,
 		m:        req.Objs.EventsPam,
-		topic:    "perf:pam_authenticate",
 		analyzer: *req.Analyzer,
 		handler:  pamPerfEventHandler,
 	})
