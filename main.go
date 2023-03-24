@@ -91,7 +91,7 @@ type ProbeRequest struct {
 }
 
 func AttachProbesFactory(ctx context.Context, config *config.Config, objs *bpfObjects) func() {
-	behaviorAnalyzer := analyzer.NewAnalyzer(0)
+	behaviorAnalyzer := analyzer.NewAnalyzer(ctx, 0)
 	evBus := EventBus.New()
 
 	req := &ProbeRequest{
@@ -122,6 +122,5 @@ func AttachProbesFactory(ctx context.Context, config *config.Config, objs *bpfOb
 		for _, p := range probes {
 			p.Close()
 		}
-		behaviorAnalyzer.Stop()
 	}
 }

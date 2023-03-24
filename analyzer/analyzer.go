@@ -1,14 +1,10 @@
 package analyzer
 
-import (
-	"time"
-
-	"golang.org/x/exp/slog"
-)
+import "context"
 
 type Analyzer struct {
+	ctx          context.Context
 	behaviorChan chan Behavior
-	stopper      chan struct{}
 	history      []Behavior
 }
 
@@ -23,52 +19,24 @@ func (a *Analyzer) analyze() {
 		select {
 		case behavior := <-a.behaviorChan:
 			a.analyzeBehavior(behavior)
-		case <-a.stopper:
+		case <-a.ctx.Done():
 			return
 		}
 	}
 }
 
 func (a *Analyzer) analyzeBehavior(behavior Behavior) {
-	switch v := behavior.(type) {
-	case *OpenptyBehavior:
-		if v.Comm != "sshd" {
-			return
-		}
-		if len(a.history) == 0 {
-			slog.Warn("[found dangerous login]")
-		} else if _, ok := a.history[len(a.history)-1].(*PamAuthenticateBehavior); !ok {
-			slog.Warn("[found dangerous login]")
-		} else if pam := a.history[len(a.history)-1].(*PamAuthenticateBehavior); v.Time.Sub(pam.Time) > time.Minute {
-			slog.Warn("[found dangerous login]")
-		} else {
-			slog.Info("[normal login]")
-		}
-		a.history = append(a.history, v)
-	case *PamAuthenticateBehavior:
-		if v.Comm != "sshd" {
-			return
-		}
-		a.history = append(a.history, v)
-	case *SyscallBehavior:
-
-	default:
-		slog.Info("[Unknown behavior]")
-	}
+	behavior.Handle(a)
 	// Drop unused history behavior.
 	if len(a.history) >= behaviorHistoryLength-1 {
 		a.history = a.history[behaviorHistoryLength/2:]
 	}
 }
 
-func (a *Analyzer) Stop() {
-	a.stopper <- struct{}{}
-}
-
-func NewAnalyzer(chanSize int) *Analyzer {
+func NewAnalyzer(ctx context.Context, chanSize int) *Analyzer {
 	a := Analyzer{
+		ctx:          ctx,
 		behaviorChan: make(chan Behavior, chanSize),
-		stopper:      make(chan struct{}, 0),
 		history:      make([]Behavior, 0, behaviorHistoryLength),
 	}
 	go func() {
