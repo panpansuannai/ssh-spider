@@ -69,12 +69,15 @@ func AttachSyscallTraceEnter(req *ProbeRequest) []link.Link {
 	}
 	syscallTable = table
 
-	kp, err := link.Kprobe("syscall_trace_enter", req.Objs.BeforeSyscallTraceEnter, nil)
-	if err != nil {
-		slog.Error("loading syscall_trace_enter error", err)
-	}
+	kps := util.NewKProbeCollection().AttachKProbes([]util.KProbeAttachOptions{
+		{
+			Symbol:     "syscall_trace_enter",
+			IsRetProbe: false,
+			Probe:      req.Objs.BeforeSyscallTraceEnter,
+		},
+	})
 
 	req.EvBus.Subscribe("perf:syscall_trace_enter", syscallTraceEnterHandler)
 	util.PerfHandle(req.Ctx, req.Objs.EventsSyscallTraceEnter, req.EvBus, "perf:syscall_trace_enter", req.Analyzer)
-	return []link.Link{kp}
+	return kps
 }

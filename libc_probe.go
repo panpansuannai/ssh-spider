@@ -76,47 +76,47 @@ func getpwuidPerfEventHandler(a *analyzer.Analyzer, m util.PerfMsg) {
 
 func AttachLibC(req *ProbeRequest) []link.Link {
 	const cLibPath = "/usr/lib/x86_64-linux-gnu/libc.so.6"
-	libC := util.NewUprobeCollection(cLibPath)
-	probes := libC.AttachUProbes([]util.UprobeAttachOptions{
+	libC := util.NewUProbeCollection(cLibPath)
+	probes := libC.AttachUProbes([]util.UProbeAttachOptions{
 		{
 			Symbol:     "getpwnam",
 			IsRetProbe: false,
-			Uprobe:     req.Objs.BeforeGetpwnam,
+			Probe:      req.Objs.BeforeGetpwnam,
 		},
 		{
 			Symbol:     "getpwnam",
 			IsRetProbe: true,
-			Uprobe:     req.Objs.AfterGetpwnam,
+			Probe:      req.Objs.AfterGetpwnam,
 		},
 		{
 			Symbol:     "getpwnam_r",
 			IsRetProbe: false,
-			Uprobe:     req.Objs.BeforeGetpwnamR,
+			Probe:      req.Objs.BeforeGetpwnamR,
 		},
 		{
 			Symbol:     "getpwnam_r",
 			IsRetProbe: true,
-			Uprobe:     req.Objs.AfterGetpwnamR,
+			Probe:      req.Objs.AfterGetpwnamR,
 		},
 		{
 			Symbol:     "getpwuid",
 			IsRetProbe: false,
-			Uprobe:     req.Objs.BeforeGetpwuid,
+			Probe:      req.Objs.BeforeGetpwuid,
 		},
 		{
 			Symbol:     "getpwuid",
 			IsRetProbe: true,
-			Uprobe:     req.Objs.AfterGetpwuid,
+			Probe:      req.Objs.AfterGetpwuid,
 		},
 		{
 			Symbol:     "getpwuid_r",
 			IsRetProbe: false,
-			Uprobe:     req.Objs.BeforeGetpwuidR,
+			Probe:      req.Objs.BeforeGetpwuidR,
 		},
 		{
 			Symbol:     "getpwuid_r",
 			IsRetProbe: true,
-			Uprobe:     req.Objs.AfterGetpwuidR,
+			Probe:      req.Objs.AfterGetpwuidR,
 		},
 	})
 

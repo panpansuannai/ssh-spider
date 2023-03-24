@@ -125,17 +125,17 @@ func pamPerfEventHandler(a *analyzer.Analyzer, m util.PerfMsg) {
 
 func AttachLibPam(req *ProbeRequest) []link.Link {
 	const pamLibPath = "/lib/x86_64-linux-gnu/libpam.so.0"
-	libUtil := util.NewUprobeCollection(pamLibPath)
-	probes := libUtil.AttachUProbes([]util.UprobeAttachOptions{
+	libUtil := util.NewUProbeCollection(pamLibPath)
+	probes := libUtil.AttachUProbes([]util.UProbeAttachOptions{
 		{
 			Symbol:     "pam_authenticate",
 			IsRetProbe: false,
-			Uprobe:     req.Objs.BeforePamAuthenticate,
+			Probe:      req.Objs.BeforePamAuthenticate,
 		},
 		{
 			Symbol:     "pam_authenticate",
 			IsRetProbe: true,
-			Uprobe:     req.Objs.AfterPamAuthenticate,
+			Probe:      req.Objs.AfterPamAuthenticate,
 		},
 	})
 	req.EvBus.Subscribe("perf:pam_authenticate", pamPerfEventHandler)

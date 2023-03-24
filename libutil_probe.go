@@ -43,12 +43,12 @@ func openptyPerfEventHandler(a *analyzer.Analyzer, m util.PerfMsg) {
 
 func AttachLibUtil(req *ProbeRequest) []link.Link {
 	const utilLibPath = "/usr/lib/x86_64-linux-gnu/libutil.so"
-	libUtil := util.NewUprobeCollection(utilLibPath)
-	probes := libUtil.AttachUProbes([]util.UprobeAttachOptions{
+	libUtil := util.NewUProbeCollection(utilLibPath)
+	probes := libUtil.AttachUProbes([]util.UProbeAttachOptions{
 		{
 			Symbol:     "openpty",
 			IsRetProbe: true,
-			Uprobe:     req.Objs.AfterOpenpty,
+			Probe:      req.Objs.AfterOpenpty,
 		},
 	})
 	req.EvBus.Subscribe("perf:openpty", openptyPerfEventHandler)
