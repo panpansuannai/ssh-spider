@@ -35,3 +35,16 @@ func (h *JSONLogHandler) Handle(ctx context.Context, record slog.Record) error {
 func (h *JSONLogHandler) Chan() chan []byte {
 	return h.writer.Chan
 }
+
+func InitSlog(config *config.Config) <-chan []byte {
+	// Setup slog library.
+	var logLevel = new(slog.LevelVar)
+	logLevel.Set(config.LogLevel)
+	h := NewJSONLogHandler(
+		slog.HandlerOptions{
+			AddSource: config.LogSource,
+			Level:     logLevel,
+		}, config)
+	slog.SetDefault(slog.New(h))
+	return h.Chan()
+}

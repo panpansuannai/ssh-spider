@@ -19,60 +19,24 @@ import (
 	"cilium-spider/logger"
 )
 
-type ProbeRequest struct {
-	Ctx      context.Context
-	Objs     *bpfObjects
-	EvBus    EventBus.Bus
-	Analyzer *analyzer.Analyzer
-}
-
 func main() {
 	// Initialize config.
 	config := config.New()
 
-	// Setup slog library.
-	var logLevel = new(slog.LevelVar)
-	logLevel.Set(config.LogLevel)
-	h := logger.NewJSONLogHandler(
-		slog.HandlerOptions{
-			AddSource: config.LogSource,
-			Level:     logLevel,
-		}, config)
-	slog.SetDefault(slog.New(h))
+	ctx, canceler := context.WithCancel(context.Background())
 
-	// TODO: Handle log handler's output by recieving from chan.
-	go func() {
-		for {
-			select {
-			case msg := <-h.Chan():
-				fmt.Println(string(msg))
-			}
-		}
-	}()
+	// Initizlize slog.
+	logChan := logger.InitSlog(config)
 
-	// Allow the current process to lock memory for eBPF resources.
-	if err := rlimit.RemoveMemlock(); err != nil {
-		slog.Error("remove mem lock error", err)
-		return
-	}
+	// Hanlde log output.
+	HandleLogRecord(ctx, logChan)
 
-	// Load pre-compiled programs and maps into the kernel.
-	spec, err := loadBpf()
-	if err != nil {
-		slog.Error("loading bpf error", err)
-		return
-	}
-	objs := bpfObjects{}
+	// Initialize cilium/bpf.
+	objs := InitBPF()
 	defer objs.Close()
 
-	if err := spec.LoadAndAssign(&objs, nil); err != nil {
-		// log.Printf("%v", spec.Programs["after_getpwnam"])
-		slog.Error("loading objects error", err)
-		return
-	}
-
 	// Attach probes.
-	probeCloser := AttachProbesFactory(config, &objs)
+	probeCloser := AttachProbesFactory(ctx, config, objs)
 	defer probeCloser()
 
 	// Wait for a signal and close the perf reader,
@@ -80,16 +44,58 @@ func main() {
 	stopper := make(chan os.Signal, 1)
 	signal.Notify(stopper, os.Interrupt, syscall.SIGTERM)
 	<-stopper
+	canceler()
 	slog.Info("received signal, exiting program..")
 }
 
-func AttachProbesFactory(config *config.Config, objs *bpfObjects) func() {
+func HandleLogRecord(ctx context.Context, logChan <-chan []byte) {
+	// TODO: Handle log handler's output by recieving from chan.
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case msg := <-logChan:
+				fmt.Println(string(msg))
+			}
+		}
+	}()
+}
+
+func InitBPF() *bpfObjects {
+	// Allow the current process to lock memory for eBPF resources.
+	if err := rlimit.RemoveMemlock(); err != nil {
+		panic(fmt.Sprintf("remove mem lock error: %s", err))
+	}
+
+	// Load pre-compiled programs and maps into the kernel.
+	spec, err := loadBpf()
+	if err != nil {
+		panic(fmt.Sprintf("loading bpf error: %s", err))
+	}
+	objs := bpfObjects{}
+	defer objs.Close()
+
+	if err := spec.LoadAndAssign(&objs, nil); err != nil {
+		// log.Printf("%v", spec.Programs["after_getpwnam"])
+		panic(fmt.Sprintf("loading objects error: %s", err))
+	}
+	return &objs
+}
+
+type ProbeRequest struct {
+	Ctx      context.Context
+	Objs     *bpfObjects
+	EvBus    EventBus.Bus
+	Analyzer *analyzer.Analyzer
+}
+
+func AttachProbesFactory(ctx context.Context, config *config.Config, objs *bpfObjects) func() {
 	behaviorAnalyzer := analyzer.NewAnalyzer(0)
 	evBus := EventBus.New()
-	perfCtx, perfCanceler := context.WithCancel(context.Background())
 
 	req := &ProbeRequest{
-		Ctx:      perfCtx,
+		Ctx:      ctx,
 		Objs:     objs,
 		EvBus:    evBus,
 		Analyzer: behaviorAnalyzer,
@@ -116,7 +122,6 @@ func AttachProbesFactory(config *config.Config, objs *bpfObjects) func() {
 		for _, p := range probes {
 			p.Close()
 		}
-		perfCanceler()
 		behaviorAnalyzer.Stop()
 	}
 }
