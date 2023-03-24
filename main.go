@@ -10,6 +10,7 @@ import (
 	"syscall"
 
 	"github.com/asaskevich/EventBus"
+	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/rlimit"
 	"golang.org/x/exp/slog"
 
@@ -17,6 +18,13 @@ import (
 	"cilium-spider/config"
 	"cilium-spider/logger"
 )
+
+type ProbeRequest struct {
+	Ctx      context.Context
+	Objs     *bpfObjects
+	EvBus    EventBus.Bus
+	Analyzer *analyzer.Analyzer
+}
 
 func main() {
 	// Initialize config.
@@ -29,7 +37,7 @@ func main() {
 		slog.HandlerOptions{
 			AddSource: config.LogSource,
 			Level:     logLevel,
-		})
+		}, config)
 	slog.SetDefault(slog.New(h))
 
 	// TODO: Handle log handler's output by recieving from chan.
@@ -63,42 +71,52 @@ func main() {
 		return
 	}
 
+	// Attach probes.
+	probeCloser := AttachProbesFactory(config, &objs)
+	defer probeCloser()
+
+	// Wait for a signal and close the perf reader,
+	// which will interrupt rd.Read() and make the program exit.
+	stopper := make(chan os.Signal, 1)
+	signal.Notify(stopper, os.Interrupt, syscall.SIGTERM)
+	<-stopper
+	slog.Info("received signal, exiting program..")
+}
+
+func AttachProbesFactory(config *config.Config, objs *bpfObjects) func() {
 	behaviorAnalyzer := analyzer.NewAnalyzer(0)
-	defer behaviorAnalyzer.Stop()
-
 	evBus := EventBus.New()
-
 	perfCtx, perfCanceler := context.WithCancel(context.Background())
-	defer perfCanceler()
 
+	req := &ProbeRequest{
+		Ctx:      perfCtx,
+		Objs:     objs,
+		EvBus:    evBus,
+		Analyzer: behaviorAnalyzer,
+	}
+
+	probes := make([]link.Link, 0)
 	if config.UseSyscall {
-		for _, p := range AttachSyscallTraceEnter(perfCtx, &objs, evBus, behaviorAnalyzer) {
-			defer p.Close()
-		}
+		probes = append(probes, AttachSyscallTraceEnter(req)...)
 	}
 
 	if config.UseLibC {
-		for _, p := range AttachLibC(perfCtx, &objs, evBus, behaviorAnalyzer) {
-			defer p.Close()
-		}
+		probes = append(probes, AttachLibC(req)...)
 	}
 
 	if config.UseLibPam {
-		for _, p := range AttachLibPam(perfCtx, &objs, evBus, behaviorAnalyzer) {
-			defer p.Close()
-		}
+		probes = append(probes, AttachLibPam(req)...)
 	}
 
 	if config.UseLibUtil {
-		for _, p := range AttachLibUtil(perfCtx, &objs, evBus, behaviorAnalyzer) {
-			defer p.Close()
-		}
+		probes = append(probes, AttachLibUtil(req)...)
 	}
 
-	stopper := make(chan os.Signal, 1)
-	signal.Notify(stopper, os.Interrupt, syscall.SIGTERM)
-	// Wait for a signal and close the perf reader,
-	// which will interrupt rd.Read() and make the program exit.
-	<-stopper
-	slog.Info("received signal, exiting program..")
+	return func() {
+		for _, p := range probes {
+			p.Close()
+		}
+		perfCanceler()
+		behaviorAnalyzer.Stop()
+	}
 }

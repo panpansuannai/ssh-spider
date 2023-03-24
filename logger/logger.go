@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"cilium-spider/config"
 	"context"
 
 	"golang.org/x/exp/slog"
@@ -9,17 +10,22 @@ import (
 type JSONLogHandler struct {
 	slog.JSONHandler
 	writer *chanWriter
+	filter logFilter
 }
 
-func NewJSONLogHandler(opts slog.HandlerOptions) *JSONLogHandler {
+func NewJSONLogHandler(opts slog.HandlerOptions, conf *config.Config) *JSONLogHandler {
 	h := JSONLogHandler{
 		writer: newChanWriter(16),
+		filter: NewLogFilter(conf),
 	}
 	h.JSONHandler = *opts.NewJSONHandler(h.writer)
 	return &h
 }
 
 func (h *JSONLogHandler) Handle(ctx context.Context, record slog.Record) error {
+	if !h.filter.Filter(record) {
+		return nil
+	}
 	if err := h.JSONHandler.Handle(ctx, record); err != nil {
 		return err
 	}

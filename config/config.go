@@ -1,18 +1,21 @@
 package config
 
 import (
+	"errors"
 	"flag"
+	"strings"
 
 	"golang.org/x/exp/slog"
 )
 
 type Config struct {
-	UseLibPam  bool
-	UseLibC    bool
-	UseLibUtil bool
-	UseSyscall bool
-	LogSource  bool
-	LogLevel   slog.Level
+	UseLibPam     bool
+	UseLibC       bool
+	UseLibUtil    bool
+	UseSyscall    bool
+	LogSource     bool
+	LogLevel      slog.Level
+	LogFilterCond map[string]string
 }
 
 func New() *Config {
@@ -22,6 +25,20 @@ func New() *Config {
 	flag.BoolVar(&c.UseLibUtil, "libutil", false, "use libutil probes")
 	flag.BoolVar(&c.UseSyscall, "syscall", false, "use syscall_trace_enter kprobes")
 	flag.BoolVar(&c.LogSource, "logsource", true, "add source message to log")
+	// Logger filter condition.
+	flag.Func("filter", "filter log [-filter COMM:sshd]", func(s string) error {
+		ind := strings.Index(s, ":")
+		if ind == -1 {
+			return errors.New("error")
+		}
+		name := s[:ind]
+		val := s[ind+1:]
+		if len(name) == 0 || len(val) == 0 {
+			return errors.New("error")
+		}
+		c.LogFilterCond[name] = val
+		return nil
+	})
 	logLevel := 0
 	flag.IntVar(&logLevel, "loglevel", 0, "log level [0|1|2|3]")
 	flag.Parse()

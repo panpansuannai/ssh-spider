@@ -4,12 +4,10 @@ import (
 	"bytes"
 	"cilium-spider/analyzer"
 	"cilium-spider/util"
-	"context"
 	"encoding/binary"
 	"log"
 	"time"
 
-	"github.com/asaskevich/EventBus"
 	"github.com/cilium/ebpf/link"
 	"golang.org/x/exp/slog"
 )
@@ -125,23 +123,22 @@ func pamPerfEventHandler(a *analyzer.Analyzer, m util.PerfMsg) {
 	slog.Debug("", event.GenerateSlogAttr())
 }
 
-func AttachLibPam(ctx context.Context, objs *bpfObjects, evBus EventBus.Bus, a *analyzer.Analyzer) []link.Link {
+func AttachLibPam(req *ProbeRequest) []link.Link {
 	const pamLibPath = "/lib/x86_64-linux-gnu/libpam.so.0"
 	libUtil := util.NewUprobeCollection(pamLibPath)
 	probes := libUtil.AttachUProbes([]util.UprobeAttachOptions{
 		{
 			Symbol:     "pam_authenticate",
 			IsRetProbe: false,
-			Uprobe:     objs.BeforePamAuthenticate,
+			Uprobe:     req.Objs.BeforePamAuthenticate,
 		},
 		{
 			Symbol:     "pam_authenticate",
 			IsRetProbe: true,
-			Uprobe:     objs.AfterPamAuthenticate,
+			Uprobe:     req.Objs.AfterPamAuthenticate,
 		},
 	})
-	evBus.Subscribe("perf:pam_authenticate", pamPerfEventHandler)
-	util.PerfHandle(ctx, objs.EventsPam, evBus, "perf:pam_authenticate", a)
+	req.EvBus.Subscribe("perf:pam_authenticate", pamPerfEventHandler)
+	util.PerfHandle(req.Ctx, req.Objs.EventsPam, req.EvBus, "perf:pam_authenticate", req.Analyzer)
 	return probes
-
 }

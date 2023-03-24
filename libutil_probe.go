@@ -4,11 +4,9 @@ import (
 	"bytes"
 	"cilium-spider/analyzer"
 	"cilium-spider/util"
-	"context"
 	"encoding/binary"
 	"time"
 
-	"github.com/asaskevich/EventBus"
 	"github.com/cilium/ebpf/link"
 	"golang.org/x/exp/slog"
 )
@@ -43,17 +41,17 @@ func openptyPerfEventHandler(a *analyzer.Analyzer, m util.PerfMsg) {
 
 }
 
-func AttachLibUtil(ctx context.Context, objs *bpfObjects, evBus EventBus.Bus, a *analyzer.Analyzer) []link.Link {
+func AttachLibUtil(req *ProbeRequest) []link.Link {
 	const utilLibPath = "/usr/lib/x86_64-linux-gnu/libutil.so"
 	libUtil := util.NewUprobeCollection(utilLibPath)
 	probes := libUtil.AttachUProbes([]util.UprobeAttachOptions{
 		{
 			Symbol:     "openpty",
 			IsRetProbe: true,
-			Uprobe:     objs.AfterOpenpty,
+			Uprobe:     req.Objs.AfterOpenpty,
 		},
 	})
-	evBus.Subscribe("perf:openpty", openptyPerfEventHandler)
-	util.PerfHandle(ctx, objs.EventsOpenpty, evBus, "perf:openpty", a)
+	req.EvBus.Subscribe("perf:openpty", openptyPerfEventHandler)
+	util.PerfHandle(req.Ctx, req.Objs.EventsOpenpty, req.EvBus, "perf:openpty", req.Analyzer)
 	return probes
 }

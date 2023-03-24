@@ -4,12 +4,10 @@ import (
 	"bytes"
 	"cilium-spider/analyzer"
 	"cilium-spider/util"
-	"context"
 	"encoding/binary"
 	"fmt"
 	"time"
 
-	"github.com/asaskevich/EventBus"
 	"github.com/cilium/ebpf/link"
 	"golang.org/x/exp/slog"
 )
@@ -63,7 +61,7 @@ func syscallTraceEnterHandler(a *analyzer.Analyzer, m util.PerfMsg) {
 	}
 }
 
-func AttachSyscallTraceEnter(ctx context.Context, objs *bpfObjects, evBus EventBus.Bus, a *analyzer.Analyzer) []link.Link {
+func AttachSyscallTraceEnter(req *ProbeRequest) []link.Link {
 	// Generate system call table, map system call number to system call name.
 	table, err := util.ParseSyscallsTBLFile("./syscall_64.tbl")
 	if err != nil {
@@ -71,12 +69,12 @@ func AttachSyscallTraceEnter(ctx context.Context, objs *bpfObjects, evBus EventB
 	}
 	syscallTable = table
 
-	kp, err := link.Kprobe("syscall_trace_enter", objs.BeforeSyscallTraceEnter, nil)
+	kp, err := link.Kprobe("syscall_trace_enter", req.Objs.BeforeSyscallTraceEnter, nil)
 	if err != nil {
 		slog.Error("loading syscall_trace_enter error", err)
 	}
 
-	evBus.Subscribe("perf:syscall_trace_enter", syscallTraceEnterHandler)
-	util.PerfHandle(ctx, objs.EventsSyscallTraceEnter, evBus, "perf:syscall_trace_enter", a)
+	req.EvBus.Subscribe("perf:syscall_trace_enter", syscallTraceEnterHandler)
+	util.PerfHandle(req.Ctx, req.Objs.EventsSyscallTraceEnter, req.EvBus, "perf:syscall_trace_enter", req.Analyzer)
 	return []link.Link{kp}
 }

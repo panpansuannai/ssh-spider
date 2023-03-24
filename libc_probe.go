@@ -4,11 +4,9 @@ import (
 	"bytes"
 	"cilium-spider/analyzer"
 	"cilium-spider/util"
-	"context"
 	"encoding/binary"
 	"log"
 
-	"github.com/asaskevich/EventBus"
 	"github.com/cilium/ebpf/link"
 	"golang.org/x/exp/slog"
 )
@@ -76,55 +74,55 @@ func getpwuidPerfEventHandler(a *analyzer.Analyzer, m util.PerfMsg) {
 	}
 }
 
-func AttachLibC(ctx context.Context, objs *bpfObjects, evBus EventBus.Bus, a *analyzer.Analyzer) []link.Link {
+func AttachLibC(req *ProbeRequest) []link.Link {
 	const cLibPath = "/usr/lib/x86_64-linux-gnu/libc.so.6"
 	libC := util.NewUprobeCollection(cLibPath)
 	probes := libC.AttachUProbes([]util.UprobeAttachOptions{
 		{
 			Symbol:     "getpwnam",
 			IsRetProbe: false,
-			Uprobe:     objs.BeforeGetpwnam,
+			Uprobe:     req.Objs.BeforeGetpwnam,
 		},
 		{
 			Symbol:     "getpwnam",
 			IsRetProbe: true,
-			Uprobe:     objs.AfterGetpwnam,
+			Uprobe:     req.Objs.AfterGetpwnam,
 		},
 		{
 			Symbol:     "getpwnam_r",
 			IsRetProbe: false,
-			Uprobe:     objs.BeforeGetpwnamR,
+			Uprobe:     req.Objs.BeforeGetpwnamR,
 		},
 		{
 			Symbol:     "getpwnam_r",
 			IsRetProbe: true,
-			Uprobe:     objs.AfterGetpwnamR,
+			Uprobe:     req.Objs.AfterGetpwnamR,
 		},
 		{
 			Symbol:     "getpwuid",
 			IsRetProbe: false,
-			Uprobe:     objs.BeforeGetpwuid,
+			Uprobe:     req.Objs.BeforeGetpwuid,
 		},
 		{
 			Symbol:     "getpwuid",
 			IsRetProbe: true,
-			Uprobe:     objs.AfterGetpwuid,
+			Uprobe:     req.Objs.AfterGetpwuid,
 		},
 		{
 			Symbol:     "getpwuid_r",
 			IsRetProbe: false,
-			Uprobe:     objs.BeforeGetpwuidR,
+			Uprobe:     req.Objs.BeforeGetpwuidR,
 		},
 		{
 			Symbol:     "getpwuid_r",
 			IsRetProbe: true,
-			Uprobe:     objs.AfterGetpwuidR,
+			Uprobe:     req.Objs.AfterGetpwuidR,
 		},
 	})
 
-	evBus.Subscribe("perf:getpwnam", getpwnamPerfEventHandler)
-	evBus.Subscribe("perf:getpwuid", getpwuidPerfEventHandler)
-	util.PerfHandle(ctx, objs.EventsGetpwnam, evBus, "perf:getpwnam", a)
-	util.PerfHandle(ctx, objs.EventsGetpwuid, evBus, "perf:getpwuid", a)
+	req.EvBus.Subscribe("perf:getpwnam", getpwnamPerfEventHandler)
+	req.EvBus.Subscribe("perf:getpwuid", getpwuidPerfEventHandler)
+	util.PerfHandle(req.Ctx, req.Objs.EventsGetpwnam, req.EvBus, "perf:getpwnam", req.Analyzer)
+	util.PerfHandle(req.Ctx, req.Objs.EventsGetpwuid, req.EvBus, "perf:getpwuid", req.Analyzer)
 	return probes
 }
