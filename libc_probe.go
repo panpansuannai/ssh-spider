@@ -2,9 +2,12 @@ package main
 
 import (
 	"bytes"
+	"cilium-spider/analyzer"
 	"cilium-spider/util"
 	"encoding/binary"
+	"fmt"
 	"log"
+	"time"
 
 	"github.com/cilium/ebpf/link"
 	"golang.org/x/exp/slog"
@@ -73,63 +76,117 @@ func getpwuidPerfEventHandler(req *PerfMsgHandleRequest) {
 	}
 }
 
+func (e *bpfEventAccept) toBehavior() analyzer.Behavior {
+	return &analyzer.Acceptbehavior{
+		BehaviorBase: analyzer.BehaviorBase{
+			Pid:  e.Base.Pid,
+			Comm: int8Slice2String(e.Base.Comm[:]),
+			Time: time.Now(),
+		},
+		ListenSockFd: e.ListenSockfd,
+		ClientSockFd: e.ClientSockfd,
+	}
+}
+
+func acceptPerfEventHandler(req *PerfMsgHandleRequest) {
+	switch req.Msg.MsgTy {
+	case MSG_TY_SUCCESS:
+		var event bpfEventAccept
+		if err := binary.Read(bytes.NewBuffer(req.Msg.Rd.RawSample), binary.LittleEndian, &event); err != nil {
+			log.Printf("parsing perf event: %s", err)
+			return
+		}
+		if req.Analyzer != nil {
+			req.Analyzer.Act(event.toBehavior())
+		}
+		slog.Debug(fmt.Sprintf("[%s:%d](%s) accept(%d)=>(%d)", int8Slice2String(event.Base.Comm[:]), event.Base.Pid, int8Slice2String(event.Base.ErrMsg[:]), event.ListenSockfd, event.ClientSockfd))
+	case MSG_TY_LOST:
+	case MSG_TY_ERR:
+	}
+}
+
 func AttachLibC(req *ProbeRequest) []link.Link {
 	const cLibPath = "/usr/lib/x86_64-linux-gnu/libc.so.6"
 	libC := util.NewUProbeCollection(cLibPath)
-	probes := libC.AttachUProbes([]util.UProbeAttachOptions{
-		{
+	opts := make([]util.UProbeAttachOptions, 0)
+	if req.Config.UseGetpwnam {
+		opts = append(opts, util.UProbeAttachOptions{
 			Symbol:     "getpwnam",
 			IsRetProbe: false,
 			Probe:      req.Objs.BeforeGetpwnam,
 		},
-		{
-			Symbol:     "getpwnam",
-			IsRetProbe: true,
-			Probe:      req.Objs.AfterGetpwnam,
-		},
-		{
-			Symbol:     "getpwnam_r",
-			IsRetProbe: false,
-			Probe:      req.Objs.BeforeGetpwnamR,
-		},
-		{
-			Symbol:     "getpwnam_r",
-			IsRetProbe: true,
-			Probe:      req.Objs.AfterGetpwnamR,
-		},
-		{
+			util.UProbeAttachOptions{
+				Symbol:     "getpwnam",
+				IsRetProbe: true,
+				Probe:      req.Objs.AfterGetpwnam,
+			},
+			util.UProbeAttachOptions{
+				Symbol:     "getpwnam_r",
+				IsRetProbe: false,
+				Probe:      req.Objs.BeforeGetpwnamR,
+			},
+			util.UProbeAttachOptions{
+				Symbol:     "getpwnam_r",
+				IsRetProbe: true,
+				Probe:      req.Objs.AfterGetpwnamR,
+			},
+		)
+		registerPerfMsgHandler(&PerfHandlerRegisterRequest{
+			ctx:      req.Ctx,
+			m:        req.Objs.EventsGetpwnam,
+			analyzer: *req.Analyzer,
+			handler:  getpwnamPerfEventHandler,
+		})
+	}
+	if req.Config.UseGetpwuid {
+		opts = append(opts, util.UProbeAttachOptions{
 			Symbol:     "getpwuid",
 			IsRetProbe: false,
 			Probe:      req.Objs.BeforeGetpwuid,
 		},
-		{
-			Symbol:     "getpwuid",
-			IsRetProbe: true,
-			Probe:      req.Objs.AfterGetpwuid,
-		},
-		{
-			Symbol:     "getpwuid_r",
+			util.UProbeAttachOptions{
+				Symbol:     "getpwuid",
+				IsRetProbe: true,
+				Probe:      req.Objs.AfterGetpwuid,
+			},
+			util.UProbeAttachOptions{
+				Symbol:     "getpwuid_r",
+				IsRetProbe: false,
+				Probe:      req.Objs.BeforeGetpwuidR,
+			},
+			util.UProbeAttachOptions{
+				Symbol:     "getpwuid_r",
+				IsRetProbe: true,
+				Probe:      req.Objs.AfterGetpwuidR,
+			},
+		)
+		registerPerfMsgHandler(&PerfHandlerRegisterRequest{
+			ctx:      req.Ctx,
+			m:        req.Objs.EventsGetpwuid,
+			analyzer: *req.Analyzer,
+			handler:  getpwuidPerfEventHandler,
+		})
+	}
+	if req.Config.UseAccept {
+		opts = append(opts, util.UProbeAttachOptions{
+			Symbol:     "accept",
 			IsRetProbe: false,
-			Probe:      req.Objs.BeforeGetpwuidR,
+			Probe:      req.Objs.BeforeAccept,
 		},
-		{
-			Symbol:     "getpwuid_r",
-			IsRetProbe: true,
-			Probe:      req.Objs.AfterGetpwuidR,
-		},
-	})
-	registerPerfMsgHandler(&PerfHandlerRegisterRequest{
-		ctx:      req.Ctx,
-		m:        req.Objs.EventsGetpwnam,
-		analyzer: *req.Analyzer,
-		handler:  getpwnamPerfEventHandler,
-	})
-	registerPerfMsgHandler(&PerfHandlerRegisterRequest{
-		ctx:      req.Ctx,
-		m:        req.Objs.EventsGetpwuid,
-		analyzer: *req.Analyzer,
-		handler:  getpwuidPerfEventHandler,
-	})
+			util.UProbeAttachOptions{
+				Symbol:     "accept",
+				IsRetProbe: true,
+				Probe:      req.Objs.AfterAccept,
+			},
+		)
+		registerPerfMsgHandler(&PerfHandlerRegisterRequest{
+			ctx:      req.Ctx,
+			m:        req.Objs.EventsAccept,
+			analyzer: *req.Analyzer,
+			handler:  acceptPerfEventHandler,
+		})
+	}
 
+	probes := libC.AttachUProbes(opts)
 	return probes
 }

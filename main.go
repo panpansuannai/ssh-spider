@@ -9,7 +9,6 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/asaskevich/EventBus"
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/rlimit"
 	"golang.org/x/exp/slog"
@@ -74,7 +73,6 @@ func InitBPF() *bpfObjects {
 		panic(fmt.Sprintf("loading bpf error: %s", err))
 	}
 	objs := bpfObjects{}
-	defer objs.Close()
 
 	if err := spec.LoadAndAssign(&objs, nil); err != nil {
 		// log.Printf("%v", spec.Programs["after_getpwnam"])
@@ -85,8 +83,8 @@ func InitBPF() *bpfObjects {
 
 type ProbeRequest struct {
 	Ctx      context.Context
+	Config   *config.Config
 	Objs     *bpfObjects
-	EvBus    EventBus.Bus
 	Analyzer *analyzer.Analyzer
 }
 
@@ -95,6 +93,7 @@ func AttachProbesFactory(ctx context.Context, config *config.Config, objs *bpfOb
 
 	req := &ProbeRequest{
 		Ctx:      ctx,
+		Config:   config,
 		Objs:     objs,
 		Analyzer: behaviorAnalyzer,
 	}
@@ -104,9 +103,7 @@ func AttachProbesFactory(ctx context.Context, config *config.Config, objs *bpfOb
 		probes = append(probes, AttachSyscallTraceEnter(req)...)
 	}
 
-	if config.UseLibC {
-		probes = append(probes, AttachLibC(req)...)
-	}
+	probes = append(probes, AttachLibC(req)...)
 
 	if config.UseLibPam {
 		probes = append(probes, AttachLibPam(req)...)

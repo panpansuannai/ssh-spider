@@ -9,8 +9,12 @@ import (
 )
 
 type Config struct {
-	UseLibPam     bool
-	UseLibC       bool
+	UseLibPam bool
+	// Libc
+	UseGetpwnam bool
+	UseGetpwuid bool
+	UseAccept   bool
+
 	UseLibUtil    bool
 	UseSyscall    bool
 	LogSource     bool
@@ -21,7 +25,9 @@ type Config struct {
 func New() *Config {
 	c := Config{}
 	flag.BoolVar(&c.UseLibPam, "libpam", false, "use libpam probes")
-	flag.BoolVar(&c.UseLibC, "libc", false, "use libc probes")
+	flag.BoolVar(&c.UseGetpwnam, "getpwnam", false, "use getpwnam probe")
+	flag.BoolVar(&c.UseGetpwuid, "getpwuid", false, "use getpwuid probe")
+	flag.BoolVar(&c.UseAccept, "accept", false, "use accept probe")
 	flag.BoolVar(&c.UseLibUtil, "libutil", false, "use libutil probes")
 	flag.BoolVar(&c.UseSyscall, "syscall", false, "use syscall_trace_enter kprobes")
 	flag.BoolVar(&c.LogSource, "logsource", true, "add source message to log")

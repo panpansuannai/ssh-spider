@@ -12,6 +12,17 @@ import (
 	"github.com/cilium/ebpf"
 )
 
+type bpfEventAccept struct {
+	Base struct {
+		Pid    int32
+		Comm   [16]int8
+		Cpu    int32
+		ErrMsg [32]int8
+	}
+	ListenSockfd int32
+	ClientSockfd int32
+}
+
 type bpfEventGetpwnam struct {
 	Base struct {
 		Pid    int32
@@ -142,12 +153,14 @@ type bpfSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type bpfProgramSpecs struct {
+	AfterAccept             *ebpf.ProgramSpec `ebpf:"after_accept"`
 	AfterGetpwnam           *ebpf.ProgramSpec `ebpf:"after_getpwnam"`
 	AfterGetpwnamR          *ebpf.ProgramSpec `ebpf:"after_getpwnam_r"`
 	AfterGetpwuid           *ebpf.ProgramSpec `ebpf:"after_getpwuid"`
 	AfterGetpwuidR          *ebpf.ProgramSpec `ebpf:"after_getpwuid_r"`
 	AfterOpenpty            *ebpf.ProgramSpec `ebpf:"after_openpty"`
 	AfterPamAuthenticate    *ebpf.ProgramSpec `ebpf:"after_pam_authenticate"`
+	BeforeAccept            *ebpf.ProgramSpec `ebpf:"before_accept"`
 	BeforeGetpwnam          *ebpf.ProgramSpec `ebpf:"before_getpwnam"`
 	BeforeGetpwnamR         *ebpf.ProgramSpec `ebpf:"before_getpwnam_r"`
 	BeforeGetpwuid          *ebpf.ProgramSpec `ebpf:"before_getpwuid"`
@@ -160,11 +173,13 @@ type bpfProgramSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type bpfMapSpecs struct {
+	EventsAccept            *ebpf.MapSpec `ebpf:"events_accept"`
 	EventsGetpwnam          *ebpf.MapSpec `ebpf:"events_getpwnam"`
 	EventsGetpwuid          *ebpf.MapSpec `ebpf:"events_getpwuid"`
 	EventsOpenpty           *ebpf.MapSpec `ebpf:"events_openpty"`
 	EventsPam               *ebpf.MapSpec `ebpf:"events_pam"`
 	EventsSyscallTraceEnter *ebpf.MapSpec `ebpf:"events_syscall_trace_enter"`
+	HashAccept              *ebpf.MapSpec `ebpf:"hash_accept"`
 	HashGetpwnam            *ebpf.MapSpec `ebpf:"hash_getpwnam"`
 	HashGetpwnamR           *ebpf.MapSpec `ebpf:"hash_getpwnam_r"`
 	HashGetpwuid            *ebpf.MapSpec `ebpf:"hash_getpwuid"`
@@ -191,11 +206,13 @@ func (o *bpfObjects) Close() error {
 //
 // It can be passed to loadBpfObjects or ebpf.CollectionSpec.LoadAndAssign.
 type bpfMaps struct {
+	EventsAccept            *ebpf.Map `ebpf:"events_accept"`
 	EventsGetpwnam          *ebpf.Map `ebpf:"events_getpwnam"`
 	EventsGetpwuid          *ebpf.Map `ebpf:"events_getpwuid"`
 	EventsOpenpty           *ebpf.Map `ebpf:"events_openpty"`
 	EventsPam               *ebpf.Map `ebpf:"events_pam"`
 	EventsSyscallTraceEnter *ebpf.Map `ebpf:"events_syscall_trace_enter"`
+	HashAccept              *ebpf.Map `ebpf:"hash_accept"`
 	HashGetpwnam            *ebpf.Map `ebpf:"hash_getpwnam"`
 	HashGetpwnamR           *ebpf.Map `ebpf:"hash_getpwnam_r"`
 	HashGetpwuid            *ebpf.Map `ebpf:"hash_getpwuid"`
@@ -205,11 +222,13 @@ type bpfMaps struct {
 
 func (m *bpfMaps) Close() error {
 	return _BpfClose(
+		m.EventsAccept,
 		m.EventsGetpwnam,
 		m.EventsGetpwuid,
 		m.EventsOpenpty,
 		m.EventsPam,
 		m.EventsSyscallTraceEnter,
+		m.HashAccept,
 		m.HashGetpwnam,
 		m.HashGetpwnamR,
 		m.HashGetpwuid,
@@ -222,12 +241,14 @@ func (m *bpfMaps) Close() error {
 //
 // It can be passed to loadBpfObjects or ebpf.CollectionSpec.LoadAndAssign.
 type bpfPrograms struct {
+	AfterAccept             *ebpf.Program `ebpf:"after_accept"`
 	AfterGetpwnam           *ebpf.Program `ebpf:"after_getpwnam"`
 	AfterGetpwnamR          *ebpf.Program `ebpf:"after_getpwnam_r"`
 	AfterGetpwuid           *ebpf.Program `ebpf:"after_getpwuid"`
 	AfterGetpwuidR          *ebpf.Program `ebpf:"after_getpwuid_r"`
 	AfterOpenpty            *ebpf.Program `ebpf:"after_openpty"`
 	AfterPamAuthenticate    *ebpf.Program `ebpf:"after_pam_authenticate"`
+	BeforeAccept            *ebpf.Program `ebpf:"before_accept"`
 	BeforeGetpwnam          *ebpf.Program `ebpf:"before_getpwnam"`
 	BeforeGetpwnamR         *ebpf.Program `ebpf:"before_getpwnam_r"`
 	BeforeGetpwuid          *ebpf.Program `ebpf:"before_getpwuid"`
@@ -238,12 +259,14 @@ type bpfPrograms struct {
 
 func (p *bpfPrograms) Close() error {
 	return _BpfClose(
+		p.AfterAccept,
 		p.AfterGetpwnam,
 		p.AfterGetpwnamR,
 		p.AfterGetpwuid,
 		p.AfterGetpwuidR,
 		p.AfterOpenpty,
 		p.AfterPamAuthenticate,
+		p.BeforeAccept,
 		p.BeforeGetpwnam,
 		p.BeforeGetpwnamR,
 		p.BeforeGetpwuid,
