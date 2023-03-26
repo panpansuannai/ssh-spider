@@ -36,7 +36,7 @@ type bpfEventGetpwnam struct {
 		PwUid    uint32
 	}
 	LookingName [16]int8
-	Ret         int32
+	Exist       int32
 }
 
 type bpfEventGetpwuid struct {
@@ -52,7 +52,7 @@ type bpfEventGetpwuid struct {
 		PwUid    uint32
 	}
 	LookingUid uint32
-	Ret        int32
+	Exist      int32
 }
 
 type bpfEventOpenpty struct {
@@ -175,7 +175,9 @@ type bpfProgramSpecs struct {
 type bpfMapSpecs struct {
 	EventsAccept            *ebpf.MapSpec `ebpf:"events_accept"`
 	EventsGetpwnam          *ebpf.MapSpec `ebpf:"events_getpwnam"`
+	EventsGetpwnamR         *ebpf.MapSpec `ebpf:"events_getpwnam_r"`
 	EventsGetpwuid          *ebpf.MapSpec `ebpf:"events_getpwuid"`
+	EventsGetpwuidR         *ebpf.MapSpec `ebpf:"events_getpwuid_r"`
 	EventsOpenpty           *ebpf.MapSpec `ebpf:"events_openpty"`
 	EventsPam               *ebpf.MapSpec `ebpf:"events_pam"`
 	EventsSyscallTraceEnter *ebpf.MapSpec `ebpf:"events_syscall_trace_enter"`
@@ -208,7 +210,9 @@ func (o *bpfObjects) Close() error {
 type bpfMaps struct {
 	EventsAccept            *ebpf.Map `ebpf:"events_accept"`
 	EventsGetpwnam          *ebpf.Map `ebpf:"events_getpwnam"`
+	EventsGetpwnamR         *ebpf.Map `ebpf:"events_getpwnam_r"`
 	EventsGetpwuid          *ebpf.Map `ebpf:"events_getpwuid"`
+	EventsGetpwuidR         *ebpf.Map `ebpf:"events_getpwuid_r"`
 	EventsOpenpty           *ebpf.Map `ebpf:"events_openpty"`
 	EventsPam               *ebpf.Map `ebpf:"events_pam"`
 	EventsSyscallTraceEnter *ebpf.Map `ebpf:"events_syscall_trace_enter"`
@@ -224,7 +228,9 @@ func (m *bpfMaps) Close() error {
 	return _BpfClose(
 		m.EventsAccept,
 		m.EventsGetpwnam,
+		m.EventsGetpwnamR,
 		m.EventsGetpwuid,
+		m.EventsGetpwuidR,
 		m.EventsOpenpty,
 		m.EventsPam,
 		m.EventsSyscallTraceEnter,

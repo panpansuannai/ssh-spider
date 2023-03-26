@@ -33,7 +33,7 @@ struct event_getpwnam {
   struct event_base base;
   struct event_passwd result;
   char looking_name[16];
-  s32 ret;
+  s32 exist;
 };
 // Force emitting struct event into the ELF.
 const struct event_getpwnam *_1 __attribute__((unused));
@@ -42,14 +42,18 @@ struct event_getpwuid {
   struct event_base base;
   struct event_passwd result;
   u32 looking_uid;
-  s32 ret;
+  s32 exist;
 };
 // Force emitting struct event into the ELF.
-const struct event_getpwuid *_2 __attribute__((unused));
+const struct event_getpwuid *_3 __attribute__((unused));
 
 struct {
 	__uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
-} events_getpwnam SEC(".maps"), events_getpwuid SEC(".maps");
+}   events_getpwnam SEC(".maps"),
+    events_getpwuid SEC(".maps"),
+    events_getpwnam_r SEC(".maps"),
+    events_getpwuid_r SEC(".maps");
+
 
 // Get struct passwd from user space pionter `p`, and store in `result`
 static void retrieve_passwd_from_context(struct event_base* base, struct event_passwd* result, struct passwd* p) {
@@ -96,7 +100,11 @@ int after_getpwnam(struct pt_regs* ctx) {
   struct event_getpwnam event = *e;
   struct passwd* p = (struct passwd*)PT_REGS_RC(ctx);
   retrieve_passwd_from_context(&event.base, &event.result, p);
-  event.ret = (s32)PT_REGS_RC(ctx);
+  if (p == 0) {
+      event.exist = -1;
+  } else {
+      event.exist = 0;
+  }
   bpf_perf_event_output(ctx, &events_getpwnam, BPF_F_CURRENT_CPU, &event, sizeof(struct event_getpwnam));
   bpf_map_delete_elem(&hash_getpwnam, &pid);
   return 0;
@@ -132,9 +140,17 @@ int after_getpwnam_r(struct pt_regs* ctx) {
   bpf_probe_read_user_str(&event.looking_name, sizeof(event.looking_name), (char*)PT_REGS_PARM1(start_ctx));
   struct passwd* p = (struct passwd*)PT_REGS_PARM2(start_ctx);
   retrieve_passwd_from_context(&event.base, &event.result, p);
-  event.ret = (s32)PT_REGS_RC(ctx);
+  struct passwd** ptr = (struct passwd**) PT_REGS_PARM5(start_ctx);
+  struct passwd* result = 0;
+  bpf_probe_read_user(result, sizeof(struct passwd*), ptr);
+  if (result == 0) {
+      event.exist = -1;
+  } else {
+      event.exist = 0;
+  }
+  // event.exist = (s32)PT_REGS_RC(ctx);
   bpf_map_delete_elem(&hash_getpwnam_r, &id);
-	bpf_perf_event_output(ctx, &events_getpwnam, BPF_F_CURRENT_CPU, &event, sizeof(struct event_getpwnam));
+  bpf_perf_event_output(ctx, &events_getpwnam_r, BPF_F_CURRENT_CPU, &event, sizeof(struct event_getpwnam));
   return 0;
 }
 #endif
@@ -170,7 +186,11 @@ int after_getpwuid(struct pt_regs* ctx) {
   struct event_getpwuid event = *e;
   struct passwd* p = (struct passwd*)PT_REGS_RC(ctx);
   retrieve_passwd_from_context(&event.base, &event.result, p);
-  event.ret = (s32)PT_REGS_RC(ctx);
+  if (p == 0) {
+      event.exist = -1;
+  } else {
+      event.exist = 0;
+  }
   bpf_perf_event_output(ctx, &events_getpwuid, BPF_F_CURRENT_CPU, &event, sizeof(struct event_getpwuid));
   bpf_map_delete_elem(&hash_getpwuid, &pid);
   return 0;
@@ -206,9 +226,9 @@ int after_getpwuid_r(struct pt_regs* ctx) {
   event.looking_uid = (u32)PT_REGS_PARM1(start_ctx);
   struct passwd* p = (struct passwd*)PT_REGS_PARM2(start_ctx);
   retrieve_passwd_from_context(&event.base, &event.result, p);
-  event.ret = (s32)PT_REGS_RC(ctx);
+  event.exist = (s32)PT_REGS_RC(ctx);
   bpf_map_delete_elem(&hash_getpwuid_r, &id);
-	bpf_perf_event_output(ctx, &events_getpwuid, BPF_F_CURRENT_CPU, &event, sizeof(struct event_getpwuid));
+  bpf_perf_event_output(ctx, &events_getpwuid_r, BPF_F_CURRENT_CPU, &event, sizeof(struct event_getpwuid));
   return 0;
 }
 #endif
