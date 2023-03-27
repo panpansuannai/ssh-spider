@@ -142,7 +142,7 @@ int after_getpwnam_r(struct pt_regs* ctx) {
   retrieve_passwd_from_context(&event.base, &event.result, p);
   struct passwd** ptr = (struct passwd**) PT_REGS_PARM5(start_ctx);
   struct passwd* result = 0;
-  bpf_probe_read_user(result, sizeof(struct passwd*), ptr);
+  bpf_probe_read_user(&result, sizeof(struct passwd*), ptr);
   if (result == 0) {
       event.exist = -1;
   } else {

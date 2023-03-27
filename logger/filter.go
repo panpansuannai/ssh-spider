@@ -13,10 +13,16 @@ type logFilter struct {
 func (f logFilter) Filter(record slog.Record) bool {
 	ret := true
 	record.Attrs(func(attr slog.Attr) {
-		if v, ok := f.cond[attr.Key]; ok {
-			if v != attr.Value.String() {
-				ret = false
-				return
+		if attr.Key != "struct" {
+			return
+		}
+		attrs := attr.Value.Group()
+		for _, a := range attrs {
+			if v, ok := f.cond[a.Key]; ok {
+				if v != a.Value.String() {
+					ret = false
+					return
+				}
 			}
 		}
 	})

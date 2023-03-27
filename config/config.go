@@ -14,6 +14,7 @@ type Config struct {
 	UseGetpwnam bool
 	UseGetpwuid bool
 	UseAccept   bool
+	UseOpen     bool
 
 	UseLibUtil    bool
 	UseSyscall    bool
@@ -23,11 +24,14 @@ type Config struct {
 }
 
 func New() *Config {
-	c := Config{}
+	c := Config{
+		LogFilterCond: make(map[string]string),
+	}
 	flag.BoolVar(&c.UseLibPam, "libpam", false, "use libpam probes")
 	flag.BoolVar(&c.UseGetpwnam, "getpwnam", false, "use getpwnam probe")
 	flag.BoolVar(&c.UseGetpwuid, "getpwuid", false, "use getpwuid probe")
 	flag.BoolVar(&c.UseAccept, "accept", false, "use accept probe")
+	flag.BoolVar(&c.UseOpen, "open", false, "use open probe")
 	flag.BoolVar(&c.UseLibUtil, "libutil", false, "use libutil probes")
 	flag.BoolVar(&c.UseSyscall, "syscall", false, "use syscall_trace_enter kprobes")
 	flag.BoolVar(&c.LogSource, "logsource", true, "add source message to log")

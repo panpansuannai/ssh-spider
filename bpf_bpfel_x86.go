@@ -55,6 +55,18 @@ type bpfEventGetpwuid struct {
 	Exist      int32
 }
 
+type bpfEventOpen struct {
+	Base struct {
+		Pid    int32
+		Comm   [16]int8
+		Cpu    int32
+		ErrMsg [32]int8
+	}
+	Path      [64]int8
+	Fd        int32
+	FileOrDir int32
+}
+
 type bpfEventOpenpty struct {
 	Base struct {
 		Pid    int32
@@ -158,6 +170,8 @@ type bpfProgramSpecs struct {
 	AfterGetpwnamR          *ebpf.ProgramSpec `ebpf:"after_getpwnam_r"`
 	AfterGetpwuid           *ebpf.ProgramSpec `ebpf:"after_getpwuid"`
 	AfterGetpwuidR          *ebpf.ProgramSpec `ebpf:"after_getpwuid_r"`
+	AfterOpen               *ebpf.ProgramSpec `ebpf:"after_open"`
+	AfterOpenat             *ebpf.ProgramSpec `ebpf:"after_openat"`
 	AfterOpenpty            *ebpf.ProgramSpec `ebpf:"after_openpty"`
 	AfterPamAuthenticate    *ebpf.ProgramSpec `ebpf:"after_pam_authenticate"`
 	BeforeAccept            *ebpf.ProgramSpec `ebpf:"before_accept"`
@@ -165,6 +179,8 @@ type bpfProgramSpecs struct {
 	BeforeGetpwnamR         *ebpf.ProgramSpec `ebpf:"before_getpwnam_r"`
 	BeforeGetpwuid          *ebpf.ProgramSpec `ebpf:"before_getpwuid"`
 	BeforeGetpwuidR         *ebpf.ProgramSpec `ebpf:"before_getpwuid_r"`
+	BeforeOpen              *ebpf.ProgramSpec `ebpf:"before_open"`
+	BeforeOpenat            *ebpf.ProgramSpec `ebpf:"before_openat"`
 	BeforePamAuthenticate   *ebpf.ProgramSpec `ebpf:"before_pam_authenticate"`
 	BeforeSyscallTraceEnter *ebpf.ProgramSpec `ebpf:"before_syscall_trace_enter"`
 }
@@ -178,6 +194,7 @@ type bpfMapSpecs struct {
 	EventsGetpwnamR         *ebpf.MapSpec `ebpf:"events_getpwnam_r"`
 	EventsGetpwuid          *ebpf.MapSpec `ebpf:"events_getpwuid"`
 	EventsGetpwuidR         *ebpf.MapSpec `ebpf:"events_getpwuid_r"`
+	EventsOpen              *ebpf.MapSpec `ebpf:"events_open"`
 	EventsOpenpty           *ebpf.MapSpec `ebpf:"events_openpty"`
 	EventsPam               *ebpf.MapSpec `ebpf:"events_pam"`
 	EventsSyscallTraceEnter *ebpf.MapSpec `ebpf:"events_syscall_trace_enter"`
@@ -186,6 +203,8 @@ type bpfMapSpecs struct {
 	HashGetpwnamR           *ebpf.MapSpec `ebpf:"hash_getpwnam_r"`
 	HashGetpwuid            *ebpf.MapSpec `ebpf:"hash_getpwuid"`
 	HashGetpwuidR           *ebpf.MapSpec `ebpf:"hash_getpwuid_r"`
+	HashOpen                *ebpf.MapSpec `ebpf:"hash_open"`
+	HashOpenat              *ebpf.MapSpec `ebpf:"hash_openat"`
 	HashPamAuthenticate     *ebpf.MapSpec `ebpf:"hash_pam_authenticate"`
 }
 
@@ -213,6 +232,7 @@ type bpfMaps struct {
 	EventsGetpwnamR         *ebpf.Map `ebpf:"events_getpwnam_r"`
 	EventsGetpwuid          *ebpf.Map `ebpf:"events_getpwuid"`
 	EventsGetpwuidR         *ebpf.Map `ebpf:"events_getpwuid_r"`
+	EventsOpen              *ebpf.Map `ebpf:"events_open"`
 	EventsOpenpty           *ebpf.Map `ebpf:"events_openpty"`
 	EventsPam               *ebpf.Map `ebpf:"events_pam"`
 	EventsSyscallTraceEnter *ebpf.Map `ebpf:"events_syscall_trace_enter"`
@@ -221,6 +241,8 @@ type bpfMaps struct {
 	HashGetpwnamR           *ebpf.Map `ebpf:"hash_getpwnam_r"`
 	HashGetpwuid            *ebpf.Map `ebpf:"hash_getpwuid"`
 	HashGetpwuidR           *ebpf.Map `ebpf:"hash_getpwuid_r"`
+	HashOpen                *ebpf.Map `ebpf:"hash_open"`
+	HashOpenat              *ebpf.Map `ebpf:"hash_openat"`
 	HashPamAuthenticate     *ebpf.Map `ebpf:"hash_pam_authenticate"`
 }
 
@@ -231,6 +253,7 @@ func (m *bpfMaps) Close() error {
 		m.EventsGetpwnamR,
 		m.EventsGetpwuid,
 		m.EventsGetpwuidR,
+		m.EventsOpen,
 		m.EventsOpenpty,
 		m.EventsPam,
 		m.EventsSyscallTraceEnter,
@@ -239,6 +262,8 @@ func (m *bpfMaps) Close() error {
 		m.HashGetpwnamR,
 		m.HashGetpwuid,
 		m.HashGetpwuidR,
+		m.HashOpen,
+		m.HashOpenat,
 		m.HashPamAuthenticate,
 	)
 }
@@ -252,6 +277,8 @@ type bpfPrograms struct {
 	AfterGetpwnamR          *ebpf.Program `ebpf:"after_getpwnam_r"`
 	AfterGetpwuid           *ebpf.Program `ebpf:"after_getpwuid"`
 	AfterGetpwuidR          *ebpf.Program `ebpf:"after_getpwuid_r"`
+	AfterOpen               *ebpf.Program `ebpf:"after_open"`
+	AfterOpenat             *ebpf.Program `ebpf:"after_openat"`
 	AfterOpenpty            *ebpf.Program `ebpf:"after_openpty"`
 	AfterPamAuthenticate    *ebpf.Program `ebpf:"after_pam_authenticate"`
 	BeforeAccept            *ebpf.Program `ebpf:"before_accept"`
@@ -259,6 +286,8 @@ type bpfPrograms struct {
 	BeforeGetpwnamR         *ebpf.Program `ebpf:"before_getpwnam_r"`
 	BeforeGetpwuid          *ebpf.Program `ebpf:"before_getpwuid"`
 	BeforeGetpwuidR         *ebpf.Program `ebpf:"before_getpwuid_r"`
+	BeforeOpen              *ebpf.Program `ebpf:"before_open"`
+	BeforeOpenat            *ebpf.Program `ebpf:"before_openat"`
 	BeforePamAuthenticate   *ebpf.Program `ebpf:"before_pam_authenticate"`
 	BeforeSyscallTraceEnter *ebpf.Program `ebpf:"before_syscall_trace_enter"`
 }
@@ -270,6 +299,8 @@ func (p *bpfPrograms) Close() error {
 		p.AfterGetpwnamR,
 		p.AfterGetpwuid,
 		p.AfterGetpwuidR,
+		p.AfterOpen,
+		p.AfterOpenat,
 		p.AfterOpenpty,
 		p.AfterPamAuthenticate,
 		p.BeforeAccept,
@@ -277,6 +308,8 @@ func (p *bpfPrograms) Close() error {
 		p.BeforeGetpwnamR,
 		p.BeforeGetpwuid,
 		p.BeforeGetpwuidR,
+		p.BeforeOpen,
+		p.BeforeOpenat,
 		p.BeforePamAuthenticate,
 		p.BeforeSyscallTraceEnter,
 	)
@@ -292,5 +325,6 @@ func _BpfClose(closers ...io.Closer) error {
 }
 
 // Do not access this directly.
+//
 //go:embed bpf_bpfel_x86.o
 var _BpfBytes []byte

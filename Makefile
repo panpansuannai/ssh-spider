@@ -1,5 +1,5 @@
 package = main
-types = -type event_getpwnam -type event_getpwuid -type event_openpty -type event_pam -type event_syscall_trace_enter -type event_accept
+types = -type event_getpwnam -type event_getpwuid -type event_openpty -type event_pam -type event_syscall_trace_enter -type event_accept -type event_open
 
 
 all: generate cilium-spider
